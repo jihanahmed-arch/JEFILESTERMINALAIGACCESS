@@ -3,17 +3,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, FormEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Terminal, ShieldAlert, Cpu, Database, Wifi, Lock, Globe } from 'lucide-react';
 
 const LOG_MESSAGES = [
+  { text: "Establishing AIG System Engine Environment", type: "system" },
   { text: "INITIALIZING SYSTEM BOOT...", type: "system" },
   { text: "ESTABLISHING SECURE CONNECTION TO JMAIL DATA SERVER...", type: "info" },
   { text: "BYPASSING FIREWALL LAYER 1 [OK]", type: "success" },
   { text: "BYPASSING FIREWALL LAYER 2 [OK]", type: "success" },
   { text: "DECRYPTING RSA-4096 HANDSHAKE...", type: "info" },
   { text: "ACCESSING CORE KERNEL MODULES...", type: "system" },
+  { text: "LOGIN_REQUIRED", type: "auth" }, // Special marker for login
   { text: "WARNING: UNAUTHORIZED ACCESS DETECTED", type: "warning" },
   { text: "INJECTING OVERRIDE PROTOCOL...", type: "info" },
   { text: "ROOT ACCESS GRANTED", type: "success" },
@@ -27,19 +29,35 @@ export default function App() {
   const [logs, setLogs] = useState<string[]>([]);
   const [progress, setProgress] = useState(0);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [currentLogIndex, setCurrentLogIndex] = useState(0);
+  const [isLoginState, setIsLoginState] = useState(false);
+  const [loginId, setLoginId] = useState("");
+  const [loginPass, setLoginPass] = useState("");
+  const [loginError, setLoginError] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const SECURE_ID = "j4aigdevconfid";
+  const SECURE_PASS = "jeaccessjmailworldreplicaaig4";
+
   useEffect(() => {
-    let currentLogIndex = 0;
-    const totalDuration = 12000; // 12 seconds
+    if (isLoginState || isRedirecting) return;
+
+    const totalDuration = 12000;
     const logInterval = totalDuration / LOG_MESSAGES.length;
 
     const logTimer = setInterval(() => {
       if (currentLogIndex < LOG_MESSAGES.length) {
         const message = LOG_MESSAGES[currentLogIndex];
+        
+        if (message.text === "LOGIN_REQUIRED") {
+          clearInterval(logTimer);
+          setIsLoginState(true);
+          return;
+        }
+
         const timestamp = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
         setLogs(prev => [...prev, `[${timestamp}] ${message.text}`]);
-        currentLogIndex++;
+        setCurrentLogIndex(prev => prev + 1);
       } else {
         clearInterval(logTimer);
         setIsRedirecting(true);
@@ -49,6 +67,13 @@ export default function App() {
       }
     }, logInterval);
 
+    return () => clearInterval(logTimer);
+  }, [currentLogIndex, isLoginState, isRedirecting]);
+
+  useEffect(() => {
+    if (isLoginState || isRedirecting) return;
+    
+    const totalDuration = 12000;
     const progressTimer = setInterval(() => {
       setProgress(prev => {
         if (prev >= 100) {
@@ -59,17 +84,27 @@ export default function App() {
       });
     }, totalDuration / 100);
 
-    return () => {
-      clearInterval(logTimer);
-      clearInterval(progressTimer);
-    };
-  }, []);
+    return () => clearInterval(progressTimer);
+  }, [isLoginState, isRedirecting]);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [logs]);
+  }, [logs, isLoginState]);
+
+  const handleLogin = (e: FormEvent) => {
+    e.preventDefault();
+    if (loginId === SECURE_ID && loginPass === SECURE_PASS) {
+      setIsLoginState(false);
+      setLoginError(false);
+      setCurrentLogIndex(prev => prev + 1);
+    } else {
+      setLoginError(true);
+      setLoginId("");
+      setLoginPass("");
+    }
+  };
 
   return (
     <div className="relative min-h-screen flex flex-col items-center justify-center p-4 md:p-8">
@@ -103,6 +138,7 @@ export default function App() {
           <div className="mb-4 opacity-70">
             <p>Welcome to JMAIL Secure Access Terminal</p>
             <p>Authorized personnel only. All activities are logged.</p>
+            <p className="text-[#00ff41] font-bold">AIG Engine 12.03</p>
             <p className="border-b border-[#00ff41]/20 pb-2 mb-4">--------------------------------------------------</p>
           </div>
 
@@ -122,13 +158,43 @@ export default function App() {
             ))}
           </AnimatePresence>
 
-          {isRedirecting && (
+          {isLoginState && (
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="mt-6 text-center text-xl font-bold tracking-[0.2em] glitch"
+              className="mt-4 p-4 border border-[#00ff41]/30 bg-[#00ff41]/5 rounded"
             >
-              REDIRECTING TO JMAIL.WORLD...
+              <p className="text-cyan-400 mb-4 uppercase tracking-widest text-xs">Secure Authentication Required</p>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label className="block text-[10px] uppercase opacity-60 mb-1">Secure Sign In ID Number</label>
+                  <input 
+                    autoFocus
+                    type="text"
+                    value={loginId}
+                    onChange={(e) => setLoginId(e.target.value)}
+                    className="w-full bg-black border border-[#00ff41]/50 p-2 text-[#00ff41] outline-none focus:border-[#00ff41] transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase opacity-60 mb-1">Secure ID Pass</label>
+                  <input 
+                    type="password"
+                    value={loginPass}
+                    onChange={(e) => setLoginPass(e.target.value)}
+                    className="w-full bg-black border border-[#00ff41]/50 p-2 text-[#00ff41] outline-none focus:border-[#00ff41] transition-colors"
+                  />
+                </div>
+                {loginError && (
+                  <p className="text-red-500 text-xs animate-pulse">ACCESS DENIED: INVALID CREDENTIALS</p>
+                )}
+                <button 
+                  type="submit"
+                  className="w-full bg-[#00ff41]/20 border border-[#00ff41]/50 py-2 uppercase text-xs tracking-widest hover:bg-[#00ff41]/30 transition-colors"
+                >
+                  Authenticate
+                </button>
+              </form>
             </motion.div>
           )}
         </div>
