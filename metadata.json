@@ -1,0 +1,5 @@
+{
+  "name": "Terminal Access",
+  "description": "A simulated terminal interface with a hacking aesthetic that redirects to jmail.world.",
+  "requestFramePermissions": []
+}
